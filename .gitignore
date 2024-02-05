@@ -168,3 +168,4 @@ credentials.json
 config.json
 database_config.json
 remote_db_config.json
+*.pem
