@@ -3,7 +3,7 @@ import nepali_datetime
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
-import date_utils
+from utils import date_utils
 from urllib.parse import urlparse
 import time
 
@@ -86,7 +86,7 @@ def scrape_annapurna(csv_file, url):
                 # print(formated_date)
                 # print(f"formated_date:{formated_date},date_list:{date_list}")
                 # exit()
-                if(formated_date ==nepali_date and link not in links):
+                if(formated_date ==nepali_date):
                     # print(date_list)
                     links.append(link)
                     # print(f"Title: {title}, Link: {link}, Date: {formated_date}")
@@ -98,7 +98,7 @@ def scrape_annapurna(csv_file, url):
                     result['keyword'] = keyword
                     result['date_bs'] = formated_date
                     result['date_ad'] = date_in_AD.strftime('%Y-%m-%d')
-                    result['desc']=content.get_text(strip=True)
+                    result['content']=content.get_text(strip=True)
                     result['domain']="Annapurna Post"
                     results.append(result)
                     # print(results)

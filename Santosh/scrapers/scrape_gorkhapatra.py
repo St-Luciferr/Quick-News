@@ -3,7 +3,7 @@ import requests
 import argparse
 from bs4 import BeautifulSoup
 from datetime import datetime
-import date_utils
+from utils import date_utils
 import nepali_datetime
 
 def create_date_list(date,n):
@@ -95,7 +95,7 @@ def scrape_gorkhapatra(csv_file, url):
                     result['keyword'] = keyword
                     result['date_bs'] = formated_date
                     result['date_ad'] = date_in_AD.strftime('%Y-%m-%d')
-                    result['desc']=desc
+                    result['content']=desc
                     result['domain']= "Gorkhapatra"
                     results.append(result)
                     count += 1

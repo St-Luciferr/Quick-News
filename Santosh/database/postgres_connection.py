@@ -30,9 +30,9 @@ postgres_db = config['postgres']['database']
 
 # Define a model (example table "NewsBase")
 class NewsBase(Base):
-        __tablename__ = 'newsbase'
+        __tablename__ = 'ncell_news'
 
-        id = Column(Integer, Sequence('id'), primary_key=True)
+        id = Column(Integer, primary_key=True, autoincrement=True)
         title = Column(String(200))
         link = Column(String(200))
         newspaper = Column(String(200))
