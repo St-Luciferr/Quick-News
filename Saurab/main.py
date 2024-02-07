@@ -332,7 +332,7 @@ def main():
 
     print(json.dumps(news_dict, indent=4, ensure_ascii=False))
     print()
-    # insert_into_remote_db(news=news_dict, which_table=table)
+    insert_into_remote_db(news=news_dict, which_table=table)
 
 
 if __name__ == "__main__":
