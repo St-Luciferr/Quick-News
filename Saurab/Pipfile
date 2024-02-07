@@ -9,9 +9,11 @@ sqlalchemy = "*"
 psycopg2-binary = "*"
 nepali-datetime = "*"
 sshtunnel = "*"
-pandas = "*"
 bs4 = "*"
 numpy = "*"
+selenium = "*"
+pandas = "*"
+pyarrow = "*"
 
 [dev-packages]
 
