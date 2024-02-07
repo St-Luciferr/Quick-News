@@ -14,6 +14,7 @@ numpy = "*"
 selenium = "*"
 pandas = "*"
 pyarrow = "*"
+feedparser = "*"
 
 [dev-packages]
 

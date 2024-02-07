@@ -1,9 +1,13 @@
+from pandas.core.ops import arithmetic_op
 import requests
+import feedparser
 from bs4 import BeautifulSoup
 import pandas as pd
 import json
 import nepali_datetime
 import datetime
+
+from sqlalchemy import except_
 import date_utils
 
 
@@ -34,9 +38,20 @@ def cg_news_csv(file):
     return df["Nepali"].tolist()
 
 
+def cg_news_csv_english(file):
+    df = pd.read_csv(file)
+    return df["English"].tolist()
+
+
 def newsbase_csv(file):
     df = pd.read_csv(file)
-    return df["Topics"].tolist()
+    return df["Nepali"].tolist()
+
+
+def newsbase_csv_english(file):
+    df = pd.read_csv(file)
+    ss = df["English"].tolist()
+    return [value for value in ss if isinstance(value, str)]
 
 
 def scrape_ekantipur(topics, news, yesterday, today):
@@ -84,12 +99,16 @@ def scrape_ekantipur(topics, news, yesterday, today):
                         each_article_soup = BeautifulSoup(
                             each_article_page.content, "html.parser"
                         )
-                        content = each_article_soup.find(
-                            "div", class_="current-news-block"
-                        ).find_all("p")[0]
-                        if not content:
-                            continue
-                        content = content.text
+
+                        try:
+                            content = each_article_soup.find(
+                                "div", class_="current-news-block"
+                            ).find_all("p")[0]
+                        except:
+                            content = None
+
+                        if content:
+                            content = content.text
 
                         news[newspaper][topic][idx] = {
                             "title": title,
@@ -103,7 +122,7 @@ def scrape_ekantipur(topics, news, yesterday, today):
 
 
 def scrape_onlinemajdur(topics, news):
-    print(f"online majdur topics : {topics}\n")
+    print(f"onlinemajdur topics : {topics}\n")
     newspaper = "onlinemajdur"
     news[newspaper] = dict()
 
@@ -137,19 +156,6 @@ def scrape_onlinemajdur(topics, news):
                 print(e)
                 exit()
 
-            # -------------------------------- content scrapping ----------------------------------------------------
-            content = None
-            article_content = each_article_soup.find(
-                "div", class_="content single-news-text"
-            )
-            if article_content:
-                try:
-                    content = article_content.find("p").text[:255] + "..."
-                except AttributeError:
-                    continue
-            else:
-                continue
-
             if date:
                 conv_day, conv_month, conv_year = date_utils.get_eng_date(
                     date.text.split()
@@ -157,13 +163,26 @@ def scrape_onlinemajdur(topics, news):
                 date = nepali_datetime.date(conv_year, conv_month, conv_day)
                 date_bs = date.strftime("%Y-%m-%d")
                 date_ad = date.to_datetime_date().strftime("%Y-%m-%d")
-                #
+
                 # compare date and if today's date and article's date are same then append the scrapped news into news dict
                 if nepali_datetime.datetime.now().strftime(
                     "%Y-%m-%d"
                 ) == nepali_datetime.datetime(conv_year, conv_month, conv_day).strftime(
                     "%Y-%m-%d"
                 ):
+                    # -------------------------------- content scrapping ----------------------------------------------------
+                    content = None
+                    article_content = each_article_soup.find(
+                        "div", class_="content single-news-text"
+                    )
+                    if article_content:
+                        try:
+                            content = article_content.find("p").text[:255] + "..."
+                        except AttributeError:
+                            continue
+                    else:
+                        continue
+
                     news[newspaper][topic][idx] = {
                         "title": title,
                         "content": content,
@@ -172,6 +191,73 @@ def scrape_onlinemajdur(topics, news):
                         "date_bs": date_bs,
                     }
 
+    return news
+
+
+def rss_to_dict(url):
+    feed = feedparser.parse(url)
+    items = []
+    for entry in feed.entries:
+        item_dict = {}
+        item_dict["title"] = entry.title
+        item_dict["link"] = entry.link
+        item_dict["pubDate"] = entry.published
+        item_dict["description"] = entry.summary
+        items.append(item_dict)
+    return items
+
+
+def scrape_TheRisingNepalDaily(news, table):
+    i = 0
+    topics = list()
+    if table == "cg_news":
+        topics = cg_news_csv_english("./cg_news_keywords.csv")
+    elif table == "newsbase":
+        topics = newsbase_csv_english("./keywords_sbi.csv")
+    elif table == "ncell_news":
+        topics = [
+            "ncell",
+            "Ncell",
+            "telecommunication",
+            "Telecommunication",
+            "telecom",
+            "Telecom",
+        ]
+
+    print(f"TheRisingNepal topics : {topics}\n")
+    url = "https://risingnepaldaily.com/rss"
+    items = rss_to_dict(url)
+    newspaper = "TheRisingNepal"
+    news[newspaper] = dict()
+
+    for topic in topics:
+        news[newspaper][topic] = dict()
+        for each in items:
+            title = each["title"]
+            link = each["link"]
+            date = each["pubDate"]
+            date_ad = date_utils.risingNepal_date_to(date)
+
+            if topic in title:
+                print(f"\n\n{link}")
+                page = requests.get(link)
+                article_soup = BeautifulSoup(page.content, "html.parser")
+                content = (
+                    article_soup.find("div", class_="rising-single-box-one")
+                    .find_all("div", class_="blog-details")[3]
+                    .find("p")
+                    .text
+                ).split(":")[1][1:]
+                # print(content)
+
+                news[newspaper][topic][i] = {
+                    "title": title,
+                    "content": content,
+                    "link": link,
+                    "date_ad": date_ad,
+                    "date_bs": "",
+                }
+                i = i + 1
     return news
 
 
@@ -246,7 +332,6 @@ def insert_into_remote_db(news, which_table):
             )
             cursor = conn.cursor()
 
-            # news = main()
             for newspaper in news:
                 print(f"news paper:  {newspaper}\n")
                 newspaper_name_dict = news[newspaper]  # kun newspaper
@@ -302,7 +387,7 @@ def choose_table():
     choice = int(input())
 
     if choice == 1:
-        topics = cg_news_csv("./nepali_keyword.csv")
+        topics = cg_news_csv("./cg_news_keywords.csv")
         return "cg_news", topics
     elif choice == 2:
         topics = newsbase_csv("./keywords_sbi.csv")
@@ -323,12 +408,12 @@ def main():
     ## for date
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     table, topics = choose_table()
-
     print("\n\n")
 
     news_dict = scrape_himalkhabar(topics, news_dict, today, today)
     news_dict = scrape_ekantipur(topics, news_dict, today, today)
     news_dict = scrape_onlinemajdur(topics, news_dict)
+    news_dict = scrape_TheRisingNepalDaily(news_dict, table)
 
     print(json.dumps(news_dict, indent=4, ensure_ascii=False))
     print()
