@@ -32,11 +32,13 @@ postgres_user = config['postgres']['user']
 postgres_password = config['postgres']['password']
 postgres_db = config['postgres']['database']
 
-table_name='cg_news'
+news_table_name='cg_news'
+post_table_name='cg_post_table'
 Base = declarative_base() 
+
 # Define a model (example table "NewsBase")
 class NewsBase(Base):
-        __tablename__ = table_name
+        __tablename__ = news_table_name
 
         id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -49,7 +51,7 @@ class NewsBase(Base):
         date_bs = Column(String(15))
 
 class PostBase(Base):
-        __tablename__ = 'post_table'
+        __tablename__ = post_table_name
 
         id = Column(Integer, primary_key=True, autoincrement=True)
 
@@ -64,13 +66,13 @@ def fetch_news(session,NewsBase):
         results = session.query(NewsBase).all()
         session.close()
         return results
+
 def fetch_post(session,PostBase):
         results = session.query(PostBase).all()
         session.close()
         return results
         
-
-def send(credentials,receiver,csv_file):
+def main(credentials,receiver,csv_file):
      
      with SSHTunnelForwarder(
         (ssh_host, ssh_port),
@@ -78,24 +80,23 @@ def send(credentials,receiver,csv_file):
         ssh_pkey=ssh_private_key,
         remote_bind_address=(postgres_host, postgres_port)
     ) as tunnel:
-    
         try:
             engine = create_engine(
                 f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{tunnel.local_bind_port}/{postgres_db}"
             )
             print("Engine Created.")
-
-        # Perform your database operations here
-
+            # Now you can use the 'engine' object to interact with the PostgreSQL database
         except Exception as e:
             print(f"Error: {e}")
 
         Base.metadata.create_all(engine)
-    # Now you can use the 'engine' object to interact with the PostgreSQL database
         Session = sessionmaker(bind=engine)
         session = Session()
+        send(credentials,receiver,csv_file,session)
 
 
+def send(credentials,receiver,csv_file,session):
+        
         results= fetch_news(session,NewsBase)
         posts= fetch_post(session,PostBase)
         nepali_date = nepali_datetime.date.today().strftime('%Y-%m-%d')
@@ -104,12 +105,13 @@ def send(credentials,receiver,csv_file):
         with open(csv_file, 'r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             for item in reader:
+                # print(item)
                 try:
                     if(len(item['Emails'])==0):
                         continue
                     receivers.append(item['Emails'])
-                except:
-                    break
+                except Exception as e:
+                    print(f"Exception: {e}")
 
         print(receivers)    
         with open(credentials) as js:
@@ -119,9 +121,6 @@ def send(credentials,receiver,csv_file):
             jsn = json.load(js)
             Email_address = jsn['Email_address']
             Email_password = jsn['Email_password']
-            print(f"Email Address: {Email_address}")
-            print(f"Email Password: {Email_password}")
-
 
         # Attach image as MIMEImage
         message = MIMEMultipart()
@@ -131,8 +130,7 @@ def send(credentials,receiver,csv_file):
         message['To'] = receiver
         # message['BCC']= ", ".join(cc)
         all_receivers = [receiver] + receivers
-    
-    
+        
         if(len(results)==0):
             print("No articles to send")
             email_body = "<h2>No Articles Today:</h2>"
@@ -160,13 +158,19 @@ def send(credentials,receiver,csv_file):
                             </p>
                         </div>
                     </div>
-
                 </div>
                 """
             post_body = "<h2>Today's Posts:</h2>"
             for post  in posts:
-                if(result.date_bs!=nepali_date) and (result.date_ad != eng_date):
+                if(post.date != eng_date):
                     continue
+                if(post.profile):
+                     ref=f'https://twitter.com/{post.profile[1:]}'
+                     profile=post.profile
+                else:
+                    ref=post.link
+                    profile='Facebook User'
+
                 post_body += f"""
                 <div style="background-color:#f5f0f0;margin:10px 0;border-width:1px;border-style:solid;border-color:#f5f0f0;display:flex">
                     <div style="padding:0 2rem">
@@ -174,18 +178,16 @@ def send(credentials,receiver,csv_file):
                                     <h4>{post.keyword}</h4>
                                     <h4>{post.date}</h4>
                     </div>
-                    <div style="padding-bottom:20px">                
-                        <a style="text-decoration: none;" href='{post.link}'><h3 style="color:red">{post.profile}</h3></a>
+                    <div style="padding-bottom:20px">              
+                        <a style="text-decoration: none;" href={ref}><h3 style="color:red">{profile}</h3></a>
                         <div>
                             <p>{post.caption}
                                 <a style="text-decoration: none;" href='{post.link}'>Read More...</a>
                             </p>
                         </div>
                     </div>
-
                 </div>
                 """
-
 
         html_content = f"""
                         <html>
@@ -203,12 +205,7 @@ def send(credentials,receiver,csv_file):
                         </html>
                         """
         message.attach(MIMEText(html_content, 'html'))
-        # with open('banner.png', 'rb') as image_file:
-        #     image_attachment = MIMEImage(image_file.read(), name='banner.png')
-        #     image_attachment.add_header('Content-ID', '<image_banner>')
-        #     message.attach(image_attachment)
-
-        # with smtplib.SMTP_SSL('smtp.gmail.com',465) as smtp:
+        
         with smtplib.SMTP('smtp.gmail.com',587) as smtp:
             smtp.starttls()
             try:
@@ -219,9 +216,6 @@ def send(credentials,receiver,csv_file):
 
             print("Sending Email")
             try:
-                # message = "From: %s\r\n" % Email_address + "To: %s\r\n" % reciever + "CC: %s\r\n" % ",".join(cc) + "Subject: %s\r\n" % message['Subject'] + "\r\n"  + "hello"
-                # to = [reciever] + cc 
-                
                 smtp.sendmail(Email_address, all_receivers, message.as_string())
                 print(f"Email Sent to {all_receivers}")
             except Exception as e:
@@ -233,7 +227,6 @@ if __name__ == "__main__":
         description="scrapes keywords from news website")
     parser.add_argument("-f", "--filename", type=str,
                         help="Path to the csv file containing keywords")
-    # parser.add_argument("-u", "--url", type=str, help="URL to scrape")
     parser.add_argument("-r", "--receiver", type=str, help="Email address of the receiver")
     parser.add_argument("-c", "--credentials", type=str, help="Path to the credentials json file")
     args = parser.parse_args()
@@ -241,9 +234,5 @@ if __name__ == "__main__":
     # url = args.url
     credentials = args.credentials
     receiver = args.receiver
-
-    
-
-    send(credentials,receiver,csv_file)
-
+    main(credentials,receiver,csv_file)
     print("Mailing Complete")

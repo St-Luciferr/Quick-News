@@ -56,7 +56,9 @@ def scrape_gorkhapatra(csv_file, url):
 
     total_count = 0
     # Perform a search for each keyword
+    key_count=0
     for keyword in keywords:
+        key_count+=1
         search_params = {
             '_token': csrf_token,
             'keywords': keyword,
@@ -88,6 +90,7 @@ def scrape_gorkhapatra(csv_file, url):
                 # exit()
                 # if(formated_date in date_list):
                 if (formated_date==nepali_date):
+                    print(formated_date,nepali_date)
                     result = {}
                     # print(f"Title: {title}, Link: {link}")
                     result['title'] = title
@@ -103,7 +106,7 @@ def scrape_gorkhapatra(csv_file, url):
             print(
                 f"Error: Unable to retrieve data. Status Code: {response.status_code}")
 
-        print(f"Total {count} articles found for {keyword}")
+        print(f"{key_count}: Total {count} articles found for {keyword}")
         total_count += count
     print(f"Total {total_count} articles found for all keywords")
     return results

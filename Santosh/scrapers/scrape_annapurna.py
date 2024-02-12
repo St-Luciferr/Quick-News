@@ -46,7 +46,9 @@ def scrape_annapurna(csv_file, url):
     }
     total_count = 0
     # Perform a search for each keyword
+    key_count=0
     for keyword in keywords:
+        key_count+=1
         search_url=f"{url.strip()}?q={keyword}"
         print(search_url)
         response = session.get(search_url.strip(), headers=headers, timeout=40)
@@ -72,8 +74,8 @@ def scrape_annapurna(csv_file, url):
                     # date=date_element.find('time').get_text(strip=True)
                     full_date=date_element.get_text(strip=True)
                     split_date=full_date.split()
-                    nepali_date=split_date[1][:-1]+" "+split_date[0]+" "+split_date[2]+" "+split_date[3]
-                    date = date_utils.get_eng_date(nepali_date)
+                    nep_date=split_date[1][:-1]+" "+split_date[0]+" "+split_date[2]+" "+split_date[3]
+                    date = date_utils.get_eng_date(nep_date)
                     formated_date = f"{date[2]}-{date[1]}-{date[0]}"
                     date_in_AD=nepali_datetime.date(date[2], date[1], date[0]).to_datetime_date()
                     
@@ -87,6 +89,7 @@ def scrape_annapurna(csv_file, url):
                 # print(f"formated_date:{formated_date},date_list:{date_list}")
                 # exit()
                 if(formated_date ==nepali_date):
+                    print(formated_date,nepali_date)
                     # print(date_list)
                     links.append(link)
                     # print(f"Title: {title}, Link: {link}, Date: {formated_date}")
@@ -110,7 +113,7 @@ def scrape_annapurna(csv_file, url):
             print(
                 f"Error: Unable to retrieve data. Status Code: {response.status_code}")
         total_count += count
-        print(f"Total {count} articles found for {keyword}")
+        print(f"{key_count}: Total {count} articles found for {keyword}")
         time.sleep(10)
     print(f"Total {total_count} articles found for all keywords")
     return results

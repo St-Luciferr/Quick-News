@@ -7,6 +7,10 @@ import json
 from scrapers.scrape_gorkhapatra import scrape_gorkhapatra
 from scrapers.scrape_annapurna import scrape_annapurna
 
+import sys
+# reload(sys)
+# sys.setdefaultencoding('utf-8')
+sys.stdout.reconfigure(encoding='utf-8')
 
 def add_news_to_db(results,session,NewsBase,Newspaper):
     for result in results:
@@ -79,11 +83,11 @@ def main(data_file,table_name,config_file):
         Session = sessionmaker(bind=engine)
         session = Session()
 
-        # results=scrape_gorkhapatra(data_file,"https://gorkhapatraonline.com/news-search")
-        # add_news_to_db(results,session,NewsBase,"Gorkhapatra")
+        results=scrape_gorkhapatra(data_file,"https://gorkhapatraonline.com/news-search")
+        add_news_to_db(results,session,NewsBase,"Gorkhapatra")
 
-        # res=scrape_annapurna(data_file,"https://www.annapurnapost.com/search")
-        # add_news_to_db(res,session,NewsBase,"Annapurna Post")
+        res=scrape_annapurna(data_file,"https://www.annapurnapost.com/search")
+        add_news_to_db(res,session,NewsBase,"Annapurna Post")
             
         News = session.query(NewsBase).limit(10).all()
         for new in News:
@@ -92,8 +96,8 @@ def main(data_file,table_name,config_file):
         session.close()
 
 if __name__ == "__main__":
-    data_file='.\keywords\\cg_keywords.csv'
-    table_name='cg_news'
-    config_file='.\\config\\remote_db_config.json'
+    data_file='.\keywords\\sbi_keywords.csv'
+    table_name='newsbase'
+    config_file=r'E:\QuickFox\Intern\Quick-News\Santosh\config\remote_db_config.json'
 
     main(data_file,table_name,config_file)
